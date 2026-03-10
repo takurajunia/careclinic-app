@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 
 class ClaimDetailScreen extends StatefulWidget {
@@ -10,6 +11,9 @@ class ClaimDetailScreen extends StatefulWidget {
 }
 
 class _ClaimDetailScreenState extends State<ClaimDetailScreen> {
+  static const MethodChannel _browserChannel =
+      MethodChannel('careclinic/browser');
+
   Map? _claim;
   bool _loading = true;
   String _selectedStatus = 'Pending';
@@ -36,6 +40,27 @@ class _ClaimDetailScreenState extends State<ClaimDetailScreen> {
         const SnackBar(content: Text('Claim status updated!'),
             backgroundColor: Colors.green));
     _load();
+  }
+
+  Future<void> _exportPdf() async {
+    final url = '${ApiService.baseUrl}/claims/${widget.claimId}/export-pdf';
+
+    try {
+      final opened = await _browserChannel
+          .invokeMethod<bool>('openUrl', {'url': url});
+      if (opened != true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not open PDF export link')));
+      }
+    } on MissingPluginException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('PDF export is not supported on this platform')));
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open PDF export link')));
+    }
   }
 
   Widget _infoRow(String label, String? value) {
@@ -88,6 +113,13 @@ class _ClaimDetailScreenState extends State<ClaimDetailScreen> {
         ),
         backgroundColor: const Color(0xFF0077B6),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export PDF',
+            onPressed: _loading ? null : _exportPdf,
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
